@@ -12,6 +12,27 @@ imgpoints = dist_pickle["imgpoints"]
 nx = 9
 ny = 6
 
+def draw_lines(img, lines, color=[255, 0, 0], thickness=2):
+    """
+    NOTE: this is the function you might want to use as a starting point once you want to
+    average/extrapolate the line segments you detect to map out the full
+    extent of the lane (going from the result shown in raw-lines-example.mp4
+    to that shown in P1_example.mp4).
+
+    Think about things like separating line segments by their
+    slope ((y2-y1)/(x2-x1)) to decide which segments are part of the left
+    line vs. the right line.  Then, you can average the position of each of
+    the lines and extrapolate to the top and bottom of the lane.
+
+    This function draws `lines` with `color` and `thickness`.
+    Lines are drawn on the image inplace (mutates the image).
+    If you want to make the lines semi-transparent, think about combining
+    this function with the weighted_img() function below
+    """
+    for line in lines:
+        for x1, y1, x2, y2 in line:
+            cv2.line(img, (x1, y1), (x2, y2), color, thickness)
+
 def cal_undistort(img, objpoints, imgpoints):
     ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img.shape[0:2], None, None)
     undist = cv2.undistort(img, mtx, dist, None, mtx)
@@ -41,19 +62,44 @@ def thresholding(img, s_thresh, sx_thresh):
     binary=sxbinary | s_binary.astype(int)
     return binary
 
+def perspectiveTransform(img):
+    #offset = 100  # offset for dst points
+    # Grab the image shape
+    img_size = (img.shape[1], img.shape[0])
+    w=img.shape[1]
+    h = img.shape[0]
+    # For source points I'm grabbing the outer four detected corners
+    src = np.float32([[[200, h]], [[w/2-50, 450]], [[w/2+50, 450]], [[w-200, h]]])
+    ovrlines1 = cv2.line(img.copy(), tuple(src[0][0]), tuple(src[1][0]), color=[255, 0, 0], thickness=2)
+    ovrlines2 = cv2.line(img.copy(), tuple(src[1][0]), tuple(src[2][0]), color=[255, 0, 0], thickness=2)
+    ovrlines3 = cv2.line(img.copy(), tuple(src[2][0]), tuple(src[3][0]), color=[255, 0, 0], thickness=2)
+    newimg=cv2.addWeighted(img*100, 1, cv2.add(cv2.add(ovrlines1, ovrlines2), ovrlines3), .8, 0.)
+    plt.imshow(newimg)
+    #plt.show()
+
+    # For destination points, I'm arbitrarily choosing some points to be
+    # a nice fit for displaying our warped result
+    # again, not exact, but close enough for our purposes
+    dst = np.float32([[[300, h]], [[300, 0]], [[w-300, 0]], [[w-300, h]]])
+    # Given src and dst points, calculate the perspective transform matrix
+    M = cv2.getPerspectiveTransform(src, dst)
+    # Warp the image using OpenCV warpPerspective()
+    warped = cv2.warpPerspective(img.astype(float), M, img_size)
+    return warped
+
 def pipeline(img):
     # remove image distortion
     undistorted_img = cal_undistort(img, objpoints, imgpoints)
 
     # Color and Gradient Thresholding
-    result=thresholding(undistorted_img, s_thresh=(170, 255), sx_thresh=(20, 100))
+    thrshd_img=thresholding(undistorted_img, s_thresh=(170, 255), sx_thresh=(20, 100))
 
     #Perspective Transform
-
+    warped=perspectiveTransform(thrshd_img)
     #Finding the lines
 
     #result=undistorted_img
-    return result
+    return warped
 
 
 
