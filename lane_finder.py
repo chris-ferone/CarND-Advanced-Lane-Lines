@@ -184,10 +184,22 @@ def findlanelines(binary_warped):
     plt.xlim(0, 1280)
     plt.ylim(720, 0)
 
-    rocCalc(ploty, lefty, leftx, righty, rightx)
+    [left_curverad, right_curverad] = rocCalc(ploty, lefty, leftx, righty, rightx)
     fitWithHistory(binary_warped, left_fit, right_fit)
 
-    return histogram, left_fitx, right_fitx, ploty
+    return histogram, left_fitx, right_fitx, ploty, left_curverad, right_curverad
+
+def calcLaneOffset(left_fitx, right_fitx):
+    #Calculate offset from lane center
+    #left_lane = left_fit_cr[0] * y_eval ** 2 + left_fit_cr[1] * y_eval +left_fit_cr[0]
+    #right_lane = right_fit_cr[0] * y_eval ** 2 + right_fit_cr[1] * y_eval + right_fit_cr[0]
+    xm_per_pix = 3.7 / 700  # meters per pixel in x dimension
+    midpoint = (left_fitx[-1]+right_fitx[-1])/2
+    #print("left: ", left_fitx[-1])
+    #print("right: ", right_fitx[-1])
+    offset_p = 1280/2-midpoint #offset in pixels
+    offset_m = offset_p * xm_per_pix  #offset in meters
+    return offset_m
 
 def rocCalc(ploty, lefty, leftx, righty, rightx):
     # Define y-value where we want radius of curvature
@@ -269,7 +281,7 @@ def fitWithHistory(binary_warped, left_fit, right_fit):
     plt.xlim(0, 1280)
     plt.ylim(720, 0)
 
-def drawImageBackOnRoad(warped, left_fitx, right_fitx, ploty, M, undist):
+def drawImageBackOnRoad(warped, left_fitx, right_fitx, ploty, M, undist, left_curverad, right_curverad, offset_m):
     # Create an image to draw the lines on
     warp_zero = np.zeros_like(warped).astype(np.uint8)
     color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
@@ -284,9 +296,15 @@ def drawImageBackOnRoad(warped, left_fitx, right_fitx, ploty, M, undist):
 
     # Warp the blank back to original image space using inverse perspective matrix (Minv)
     Minv=np.linalg.inv(M)
-    newwarp = cv2.warpPerspective(color_warp, Minv, (image.shape[1], image.shape[0]))
+    newwarp = cv2.warpPerspective(color_warp, Minv, (undist.shape[1], undist.shape[0]))
     # Combine the result with the original image
     result = cv2.addWeighted(undist, 1, newwarp, 0.3, 0)
+
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    result = cv2.putText(result, "left curv: %d (m)" % left_curverad, (20, 40), font, 1, (255, 255, 255), 2, cv2.LINE_AA)
+    result = cv2.putText(result, "right curv: %d (m)" % right_curverad, (900, 40), font, 1, (255, 255, 255), 2, cv2.LINE_AA)
+    result = cv2.putText(result, "pos: %.2f (m)" % offset_m, (500, 40), font, 1, (255, 255, 255), 2, cv2.LINE_AA)
+    #print("offset: ", offset_m)
     fig=plt.figure()
     ax1 = fig.add_subplot(111)
     ax1.imshow(result)
@@ -312,33 +330,39 @@ def pipeline(img):
     ax1.imshow(warped)
     ax2 = fig.add_subplot(1,2,1)
     ax2.imshow(binary_warped)
-    [histogram, left_fitx, right_fitx, ploty] = findlanelines(binary_warped)
+    [histogram, left_fitx, right_fitx, ploty, left_curverad, right_curverad] = findlanelines(binary_warped)
+
+    #Calculate vehicle offset
+    offset_m = calcLaneOffset(left_fitx, right_fitx)
 
     #draw image back on road
-    result = drawImageBackOnRoad(warped, left_fitx, right_fitx, ploty, M, undistorted_img)
+    result = drawImageBackOnRoad(warped, left_fitx, right_fitx, ploty, M, undistorted_img, left_curverad, right_curverad, offset_m)
 
     return result
 
+UseStillImage = False
 
+if UseStillImage:
+    image = mpimg.imread('test_images/test5.jpg')
+    # image = mpimg.imread('camera_cal/calibration1.jpg')
 
-image = mpimg.imread('test_images/test5.jpg')
-#image = mpimg.imread('camera_cal/calibration1.jpg')
+    result = pipeline(image)
 
-#result = pipeline(image)
+    # Plot the result
+    f, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 9))
+    f.tight_layout()
 
-clip2 = VideoFileClip('project_video.mp4').subclip(0,5)
-output_clip = clip2.fl_image(pipeline)
-output_clip.write_videofile('output.mp4', audio=False)
+    ax1.imshow(image)
+    ax1.set_title('Original Image', fontsize=40)
 
-# Plot the result
-# f, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 9))
-# f.tight_layout()
-#
-# ax1.imshow(image)
-# ax1.set_title('Original Image', fontsize=40)
-#
-# ax2.imshow(result, cmap='gray')
-# ax2.set_title('Pipeline Result', fontsize=40)
-# #ax2.plot(result.shape[0]-histogram)
-# plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.)
-# plt.show()
+    ax2.imshow(result, cmap='gray')
+    ax2.set_title('Pipeline Result', fontsize=40)
+    #ax2.plot(result.shape[0]-histogram)
+    plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.)
+    plt.show()
+
+else:
+    input_clip = VideoFileClip('project_video.mp4')#.subclip(0,1)
+    output_clip = input_clip.fl_image(pipeline)
+    output_clip.write_videofile('output.mp4', audio=False)
+
