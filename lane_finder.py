@@ -3,6 +3,9 @@ import cv2
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import pickle
+# Import everything needed to edit/save/watch video clips
+from moviepy.editor import VideoFileClip
+from IPython.display import HTML
 
 # Read in the saved objpoints and imgpoints
 dist_pickle = pickle.load( open( "cc.p", "rb" ) )
@@ -85,7 +88,7 @@ def perspectiveTransform(img):
     M = cv2.getPerspectiveTransform(src, dst)
     # Warp the image using OpenCV warpPerspective()
     warped = cv2.warpPerspective(img.astype(float), M, img_size)
-    return warped
+    return warped, M
 
 def findlanelines(binary_warped):
     histogram = np.sum(binary_warped[binary_warped.shape[0] / 2:, :], axis=0)
@@ -182,8 +185,9 @@ def findlanelines(binary_warped):
     plt.ylim(720, 0)
 
     rocCalc(ploty, lefty, leftx, righty, rightx)
+    fitWithHistory(binary_warped, left_fit, right_fit)
 
-    return histogram
+    return histogram, left_fitx, right_fitx, ploty
 
 def rocCalc(ploty, lefty, leftx, righty, rightx):
     # Define y-value where we want radius of curvature
@@ -207,6 +211,86 @@ def rocCalc(ploty, lefty, leftx, righty, rightx):
     # Example values: 632.1 m    626.2 m
     return left_curverad, right_curverad
 
+def fitWithHistory(binary_warped, left_fit, right_fit):
+    # Assume you now have a new warped binary image
+    # from the next frame of video (also called "binary_warped")
+    # It's now much easier to find line pixels!
+    nonzero = binary_warped.nonzero()
+    nonzeroy = np.array(nonzero[0])
+    nonzerox = np.array(nonzero[1])
+    margin = 100
+    left_lane_inds = ((nonzerox > (left_fit[0] * (nonzeroy ** 2) + left_fit[1] * nonzeroy + left_fit[2] - margin)) & (
+    nonzerox < (left_fit[0] * (nonzeroy ** 2) + left_fit[1] * nonzeroy + left_fit[2] + margin)))
+    right_lane_inds = (
+    (nonzerox > (right_fit[0] * (nonzeroy ** 2) + right_fit[1] * nonzeroy + right_fit[2] - margin)) & (
+    nonzerox < (right_fit[0] * (nonzeroy ** 2) + right_fit[1] * nonzeroy + right_fit[2] + margin)))
+
+    # Again, extract left and right line pixel positions
+    leftx = nonzerox[left_lane_inds]
+    lefty = nonzeroy[left_lane_inds]
+    rightx = nonzerox[right_lane_inds]
+    righty = nonzeroy[right_lane_inds]
+    # Fit a second order polynomial to each
+    new_left_fit = np.polyfit(lefty, leftx, 2)
+    new_right_fit = np.polyfit(righty, rightx, 2)
+    # Generate x and y values for plotting
+    ploty = np.linspace(0, binary_warped.shape[0] - 1, binary_warped.shape[0])
+    left_fitx = new_left_fit[0] * ploty ** 2 + new_left_fit[1] * ploty + new_left_fit[2]
+    right_fitx = new_right_fit[0] * ploty ** 2 + new_right_fit[1] * ploty + new_right_fit[2]
+    return new_left_fit, new_right_fit, ploty
+
+    #Visualization Below
+
+    # Create an image to draw on and an image to show the selection window
+    out_img = np.dstack((binary_warped, binary_warped, binary_warped)) * 255
+    window_img = np.zeros_like(out_img)
+    # Color in left and right line pixels
+    out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
+    out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+
+    # Generate a polygon to illustrate the search window area
+    # And recast the x and y points into usable format for cv2.fillPoly()
+    left_line_window1 = np.array([np.transpose(np.vstack([left_fitx - margin, ploty]))])
+    left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([left_fitx + margin, ploty])))])
+    left_line_pts = np.hstack((left_line_window1, left_line_window2))
+    right_line_window1 = np.array([np.transpose(np.vstack([right_fitx - margin, ploty]))])
+    right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([right_fitx + margin, ploty])))])
+    right_line_pts = np.hstack((right_line_window1, right_line_window2))
+
+    # Draw the lane onto the warped blank image
+    cv2.fillPoly(window_img, np.int_([left_line_pts]), (0, 255, 0))
+    cv2.fillPoly(window_img, np.int_([right_line_pts]), (0, 255, 0))
+    result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
+    fig = plt.figure()
+    ax1 = fig.add_subplot(111)
+    ax1.imshow(result)
+    ax1.plot(left_fitx, ploty, color='yellow')
+    ax1.plot(right_fitx, ploty, color='yellow')
+    plt.xlim(0, 1280)
+    plt.ylim(720, 0)
+
+def drawImageBackOnRoad(warped, left_fitx, right_fitx, ploty, M, undist):
+    # Create an image to draw the lines on
+    warp_zero = np.zeros_like(warped).astype(np.uint8)
+    color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
+
+    # Recast the x and y points into usable format for cv2.fillPoly()
+    pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
+    pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+    pts = np.hstack((pts_left, pts_right))
+
+    # Draw the lane onto the warped blank image
+    cv2.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
+
+    # Warp the blank back to original image space using inverse perspective matrix (Minv)
+    Minv=np.linalg.inv(M)
+    newwarp = cv2.warpPerspective(color_warp, Minv, (image.shape[1], image.shape[0]))
+    # Combine the result with the original image
+    result = cv2.addWeighted(undist, 1, newwarp, 0.3, 0)
+    fig=plt.figure()
+    ax1 = fig.add_subplot(111)
+    ax1.imshow(result)
+
 def pipeline(img):
     # remove image distortion
     undistorted_img = cal_undistort(img, objpoints, imgpoints)
@@ -215,26 +299,24 @@ def pipeline(img):
     thrshd_img=thresholding(undistorted_img, s_thresh=(170, 255), sx_thresh=(20, 100))
 
     #Perspective Transform
-    warped=perspectiveTransform(thrshd_img)
+    [warped, M] = perspectiveTransform(thrshd_img)
+
+    #convert to warped image to binary warped
     binary_warped = np.zeros_like(warped, dtype=np.uint8)
     binary_warped[np.nonzero(warped)] = 1
-    #Finding the lines
-    fig6=plt.figure()
-    ax6 = fig6.add_subplot(1,2,2)
-    ax6.imshow(warped)
 
-    #fig7 = plt.figure()
-    ax7 = fig6.add_subplot(1,2,1)
-    plt7=ax7.imshow(binary_warped)
-    #fig6.colorbar(plt7)
-    print("warped type: ", warped.dtype)
-    print("binary warped type: ", binary_warped.dtype)
-    #Find land lines
-    historgram = findlanelines(binary_warped)
+    #Finding the lane lines
+    fig=plt.figure()
+    ax1 = fig.add_subplot(1,2,2)
+    ax1.imshow(warped)
+    ax2 = fig.add_subplot(1,2,1)
+    ax2.imshow(binary_warped)
+    [histogram, left_fitx, right_fitx, ploty] = findlanelines(binary_warped)
 
+    #draw image back on road
+    drawImageBackOnRoad(warped, left_fitx, right_fitx, ploty, M, undistorted_img)
 
-
-    return warped, historgram
+    return warped, histogram
 
 
 
@@ -242,6 +324,8 @@ image = mpimg.imread('test_images/test5.jpg')
 #image = mpimg.imread('camera_cal/calibration1.jpg')
 
 [result, histogram] = pipeline(image)
+# clip2 = VideoFileClip('project_video.mp4')
+# yellow_clip = clip2.fl_image(result)
 
 # Plot the result
 f, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 9))
