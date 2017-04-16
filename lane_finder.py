@@ -100,14 +100,14 @@ def findlanelines(binary_warped):
     midpoint = np.int(histogram.shape[0] / 2)
     leftx_base = np.argmax(histogram[:midpoint])
     rightx_base = np.argmax(histogram[midpoint:]) + midpoint
-    print("leftx_base ", leftx_base)
-    print("rightx_base ", rightx_base)
-    print("binary warped type: ", binary_warped.dtype)
+    #print("leftx_base ", leftx_base)
+    #print("rightx_base ", rightx_base)
+    #print("binary warped type: ", binary_warped.dtype)
     #plt.imread(binary_warped)
     #plt.show()
     # Create an output image to draw on and  visualize the result
     out_img = np.dstack((binary_warped, binary_warped, binary_warped)) * 255
-    print("max: ", np.argmax(out_img))
+    #print("max: ", np.argmax(out_img))
 
     # Choose the number of sliding windows
     nwindows = 9
@@ -207,7 +207,7 @@ def rocCalc(ploty, lefty, leftx, righty, rightx):
     right_curverad = ((1 + (2 * right_fit_cr[0] * y_eval * ym_per_pix + right_fit_cr[1]) ** 2) ** 1.5) / np.absolute(
         2 * right_fit_cr[0])
     # Now our radius of curvature is in meters
-    print(left_curverad, 'm', right_curverad, 'm')
+    #print(left_curverad, 'm', right_curverad, 'm')
     # Example values: 632.1 m    626.2 m
     return left_curverad, right_curverad
 
@@ -290,6 +290,7 @@ def drawImageBackOnRoad(warped, left_fitx, right_fitx, ploty, M, undist):
     fig=plt.figure()
     ax1 = fig.add_subplot(111)
     ax1.imshow(result)
+    return result
 
 def pipeline(img):
     # remove image distortion
@@ -314,28 +315,30 @@ def pipeline(img):
     [histogram, left_fitx, right_fitx, ploty] = findlanelines(binary_warped)
 
     #draw image back on road
-    drawImageBackOnRoad(warped, left_fitx, right_fitx, ploty, M, undistorted_img)
+    result = drawImageBackOnRoad(warped, left_fitx, right_fitx, ploty, M, undistorted_img)
 
-    return warped, histogram
+    return result
 
 
 
 image = mpimg.imread('test_images/test5.jpg')
 #image = mpimg.imread('camera_cal/calibration1.jpg')
 
-[result, histogram] = pipeline(image)
-# clip2 = VideoFileClip('project_video.mp4')
-# yellow_clip = clip2.fl_image(result)
+#result = pipeline(image)
+
+clip2 = VideoFileClip('project_video.mp4').subclip(0,5)
+output_clip = clip2.fl_image(pipeline)
+output_clip.write_videofile('output.mp4', audio=False)
 
 # Plot the result
-f, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 9))
-f.tight_layout()
-
-ax1.imshow(image)
-ax1.set_title('Original Image', fontsize=40)
-
-ax2.imshow(result, cmap='gray')
-ax2.set_title('Pipeline Result', fontsize=40)
-ax2.plot(result.shape[0]-histogram)
-plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.)
-plt.show()
+# f, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 9))
+# f.tight_layout()
+#
+# ax1.imshow(image)
+# ax1.set_title('Original Image', fontsize=40)
+#
+# ax2.imshow(result, cmap='gray')
+# ax2.set_title('Pipeline Result', fontsize=40)
+# #ax2.plot(result.shape[0]-histogram)
+# plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.)
+# plt.show()
