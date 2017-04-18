@@ -15,37 +15,16 @@ imgpoints = dist_pickle["imgpoints"]
 nx = 9
 ny = 6
 
-def draw_lines(img, lines, color=[255, 0, 0], thickness=2):
-    """
-    NOTE: this is the function you might want to use as a starting point once you want to
-    average/extrapolate the line segments you detect to map out the full
-    extent of the lane (going from the result shown in raw-lines-example.mp4
-    to that shown in P1_example.mp4).
-
-    Think about things like separating line segments by their
-    slope ((y2-y1)/(x2-x1)) to decide which segments are part of the left
-    line vs. the right line.  Then, you can average the position of each of
-    the lines and extrapolate to the top and bottom of the lane.
-
-    This function draws `lines` with `color` and `thickness`.
-    Lines are drawn on the image inplace (mutates the image).
-    If you want to make the lines semi-transparent, think about combining
-    this function with the weighted_img() function below
-    """
-    for line in lines:
-        for x1, y1, x2, y2 in line:
-            cv2.line(img, (x1, y1), (x2, y2), color, thickness)
-
 def cal_undistort(img, objpoints, imgpoints):
     ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img.shape[0:2], None, None)
     undist = cv2.undistort(img, mtx, dist, None, mtx)
     return undist
 
 def thresholding(img, s_thresh, sx_thresh):
-    # Convert to HSV color space and separate the V channel
-    hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HLS).astype(np.float)
-    l_channel = hsv[:, :, 1]
-    s_channel = hsv[:, :, 2]
+    # Convert to HLS color space and separate the L and S channels
+    hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS).astype(np.float)
+    l_channel = hls[:, :, 1]
+    s_channel = hls[:, :, 2]
     # Sobel x
     sobelx = cv2.Sobel(l_channel, cv2.CV_64F, 1, 0)  # Take the derivative in x
     abs_sobelx = np.absolute(sobelx)  # Absolute x derivative to accentuate lines away from horizontal
@@ -61,25 +40,17 @@ def thresholding(img, s_thresh, sx_thresh):
     # Stack each channel
     # Note color_binary[:, :, 0] is all 0s, effectively an all black image. It might
     # be beneficial to replace this channel with something else.
-    color_binary = np.dstack((np.zeros_like(sxbinary), sxbinary, s_binary))
-    binary=sxbinary | s_binary.astype(int)
+    # color_binary = np.dstack((np.zeros_like(sxbinary), sxbinary, s_binary))
+    binary = sxbinary | s_binary.astype(int)
     return binary
 
 def perspectiveTransform(img):
-    #offset = 100  # offset for dst points
     # Grab the image shape
     img_size = (img.shape[1], img.shape[0])
     w=img.shape[1]
     h = img.shape[0]
     # For source points I'm grabbing the outer four detected corners
     src = np.float32([[[200, h]], [[w/2-50, 450]], [[w/2+50, 450]], [[w-200, h]]])
-    ovrlines1 = cv2.line(img.copy(), tuple(src[0][0]), tuple(src[1][0]), color=[255, 0, 0], thickness=2)
-    ovrlines2 = cv2.line(img.copy(), tuple(src[1][0]), tuple(src[2][0]), color=[255, 0, 0], thickness=2)
-    ovrlines3 = cv2.line(img.copy(), tuple(src[2][0]), tuple(src[3][0]), color=[255, 0, 0], thickness=2)
-    newimg=cv2.addWeighted(img*100, 1, cv2.add(cv2.add(ovrlines1, ovrlines2), ovrlines3), .8, 0.)
-    plt.imshow(newimg)
-    #plt.show()
-
     # For destination points, I'm arbitrarily choosing some points to be
     # a nice fit for displaying our warped result
     # again, not exact, but close enough for our purposes
@@ -87,7 +58,7 @@ def perspectiveTransform(img):
     # Given src and dst points, calculate the perspective transform matrix
     M = cv2.getPerspectiveTransform(src, dst)
     # Warp the image using OpenCV warpPerspective()
-    warped = cv2.warpPerspective(img.astype(float), M, img_size)
+    warped = cv2.warpPerspective(img.astype(float), M, img_size, flags=cv2.INTER_LINEAR)
     return warped, M
 
 def findlanelines(binary_warped):
@@ -177,7 +148,7 @@ def findlanelines(binary_warped):
     out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
 
     cax = ax1.imshow(out_img)
-    fig1.colorbar(cax)
+    #fig1.colorbar(cax)
 
     ax1.plot(left_fitx, ploty, color='yellow')
     ax1.plot(right_fitx, ploty, color='yellow')
@@ -310,6 +281,28 @@ def drawImageBackOnRoad(warped, left_fitx, right_fitx, ploty, M, undist, left_cu
     ax1.imshow(result)
     return result
 
+def plotWarped(image, warped):
+    w=image.shape[1]
+    h = image.shape[0]
+    src = np.float32([[[200, h]], [[w/2-50, 450]], [[w/2+50, 450]], [[w-200, h]]])
+    ovrlines1 = cv2.line(image.copy(), tuple(src[0][0]), tuple(src[1][0]), color=[255, 0, 0], thickness=2)
+    ovrlines2 = cv2.line(ovrlines1, tuple(src[1][0]), tuple(src[2][0]), color=[255, 0, 0], thickness=2)
+    ovrlines3 = cv2.line(ovrlines2, tuple(src[2][0]), tuple(src[3][0]), color=[255, 0, 0], thickness=2)
+
+    dst = np.float32([[[300, h]], [[300, 0]], [[w - 300, 0]], [[w - 300, h]]])
+    ovr2lines1 = cv2.line(warped.copy(), tuple(dst[0][0]), tuple(dst[1][0]), color=[255, 0, 0], thickness=2)
+    ovr2lines2 = cv2.line(ovr2lines1, tuple(dst[1][0]), tuple(dst[2][0]), color=[255, 0, 0], thickness=2)
+    ovr2lines3 = cv2.line(ovr2lines2, tuple(dst[2][0]), tuple(dst[3][0]), color=[255, 0, 0], thickness=2)
+
+    fig = plt.figure()
+    ax1 = fig.add_subplot(1, 2, 1)
+    ax1.imshow(ovrlines3)
+    ax1.set_title('Original Image', fontsize=20)
+    ax2 = fig.add_subplot(1, 2, 2)
+    ax2.imshow(ovr2lines3)
+    ax2.set_title('Warped Image', fontsize=20)
+    plt.show()
+
 def pipeline(img):
     # remove image distortion
     undistorted_img = cal_undistort(img, objpoints, imgpoints)
@@ -319,8 +312,11 @@ def pipeline(img):
 
     #Perspective Transform
     [warped, M] = perspectiveTransform(thrshd_img)
+    #[warped2, M2] = perspectiveTransform(undistorted_img)
+    # compare warped image to original
+    #plotWarped(img, warped2)
 
-    #convert to warped image to binary warped
+    #convert warped image to binary warped
     binary_warped = np.zeros_like(warped, dtype=np.uint8)
     binary_warped[np.nonzero(warped)] = 1
 
@@ -341,6 +337,7 @@ def pipeline(img):
     return result
 
 UseStillImage = False
+additionalplots = False
 
 if UseStillImage:
     image = mpimg.imread('test_images/test5.jpg')
@@ -362,7 +359,21 @@ if UseStillImage:
     plt.show()
 
 else:
-    input_clip = VideoFileClip('project_video.mp4')#.subclip(0,1)
+    input_clip = VideoFileClip('project_video.mp4') #.subclip(0,1)
     output_clip = input_clip.fl_image(pipeline)
     output_clip.write_videofile('output.mp4', audio=False)
+
+if additionalplots:
+    #image = mpimg.imread('camera_cal/calibration1.jpg')
+    image = mpimg.imread('test_images/test1.jpg')
+    undist = cal_undistort(image, objpoints, imgpoints)
+    fig = plt.figure()
+    ax1 = fig.add_subplot(1, 2, 2)
+    ax1.imshow(undist)
+    ax1.set_title('Undistorted Image', fontsize=20)
+    ax2 = fig.add_subplot(1, 2, 1)
+    ax2.imshow(image)
+    ax2.set_title('Original Image', fontsize=20)
+
+
 

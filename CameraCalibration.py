@@ -32,24 +32,21 @@ def findimagepoints(nx, ny):
 
         # find chessboard corners
         ret, corners = cv2.findChessboardCorners(gray, (nx, ny), None)
-        #print("image name: ", fname)
+
         # if corners are found, add object points, image points
         if ret == True:
             imgpoints.append(corners)
             objpoints.append(objp)
-            #i=i+1
-            #print("count: ", i)
+
             # draw chessboard corners
             img = cv2.drawChessboardCorners(img, (nx, ny), corners, ret)
-            #plt.imshow(img)
-            #temp_path=os.path.split(fname)
-            #plt.savefig(temp_path[1])
-            #plt.show()
+
     return objpoints, imgpoints
 
 
 nx=9
 ny=6
+
 #calibrate camera
 [objpoints, imgpoints] = findimagepoints(nx, ny)
 
