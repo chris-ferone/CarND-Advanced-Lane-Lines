@@ -21,10 +21,23 @@ def cal_undistort(img, objpoints, imgpoints):
     return undist
 
 def thresholding(img, s_thresh, sx_thresh):
+    r_channel = img[:, :, 0]
+    g_channel = img[:, :, 1]
+
+    #Threshold on R channel of RGB
+    rbinary = np.zeros_like(r_channel)
+    rbinary[(r_channel >= 220) & (r_channel <= 255)] = 1
+
+    #Threshold on G channel of RGB
+    gbinary = np.zeros_like(g_channel)
+    gbinary[(g_channel >= 200) & (g_channel <= 255)] = 1
+
     # Convert to HLS color space and separate the L and S channels
     hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS).astype(np.float)
+    h_channel = hls[:, :, 0]
     l_channel = hls[:, :, 1]
     s_channel = hls[:, :, 2]
+
     # Sobel x
     sobelx = cv2.Sobel(l_channel, cv2.CV_64F, 1, 0)  # Take the derivative in x
     abs_sobelx = np.absolute(sobelx)  # Absolute x derivative to accentuate lines away from horizontal
@@ -32,17 +45,72 @@ def thresholding(img, s_thresh, sx_thresh):
 
     # Threshold x gradient
     sxbinary = np.zeros_like(scaled_sobel)
-    sxbinary[(scaled_sobel >= sx_thresh[0]) & (scaled_sobel <= sx_thresh[1])] = 1
+    sxbinary[(scaled_sobel >= 20) & (scaled_sobel <= 100)] = 1
 
-    # Threshold color channel
+    # Threshold S channel
     s_binary = np.zeros_like(s_channel)
-    s_binary[(s_channel >= s_thresh[0]) & (s_channel <= s_thresh[1])] = 1
+    s_binary[(s_channel >= 200) & (s_channel <= 230)] = 1
+
+    #Threshold on L channel
+    l_binary = np.zeros_like(l_channel)
+    l_binary[(l_channel >= 200) & (l_channel <= 255)] = 1
+
+    #Threshold on H channel
+    h_binary = np.zeros_like(h_channel)
+    h_binary[(h_channel >= 15) & (h_channel <= 25)] = 1
+
     # Stack each channel
     # Note color_binary[:, :, 0] is all 0s, effectively an all black image. It might
     # be beneficial to replace this channel with something else.
     # color_binary = np.dstack((np.zeros_like(sxbinary), sxbinary, s_binary))
-    binary = sxbinary | s_binary.astype(int)
-    return binary
+    #binary = sxbinary | s_binary.astype(int)
+
+    # fig = plt.figure()
+    # ax1 = fig.add_subplot(2, 3, 1)
+    # ax1.imshow(scaled_sobel, cmap='gray')
+    # ax2 = fig.add_subplot(2, 3, 2)
+    # ax2.imshow(r_channel, cmap='gray')
+    # ax2.set_title('R', fontsize=10)
+    # ax3 = fig.add_subplot(2, 3, 3)
+    # ax3.imshow(g_channel, cmap='gray')
+    # ax3.set_title('G', fontsize=10)
+    # ax4 = fig.add_subplot(2, 3, 4)
+    # ax4.imshow(s_channel, cmap='gray')
+    # ax4.set_title('S', fontsize=10)
+    # ax5 = fig.add_subplot(2, 3, 5)
+    # ax5.imshow(l_channel, cmap='gray')
+    # ax5.set_title('L', fontsize=10)
+    # ax6 = fig.add_subplot(2, 3, 6)
+    # ax6.imshow(h_channel, cmap='gray')
+    # ax6.set_title('H', fontsize=10)
+    #
+    # fig = plt.figure()
+    # ax1 = fig.add_subplot(2, 3, 1)
+    # ax1.imshow(sxbinary, cmap='gray')
+    # ax2 = fig.add_subplot(2, 3, 2)
+    # ax2.imshow(rbinary, cmap='gray')
+    # ax2.set_title('R', fontsize=10)
+    # ax3 = fig.add_subplot(2, 3, 3)
+    # ax3.imshow(gbinary, cmap='gray')
+    # ax3.set_title('G', fontsize=10)
+    # ax4 = fig.add_subplot(2, 3, 4)
+    # ax4.imshow(s_binary, cmap='gray')
+    # ax4.set_title('S', fontsize=10)
+    # ax5 = fig.add_subplot(2, 3, 5)
+    # ax5.imshow(l_binary, cmap='gray')
+    # ax5.set_title('L', fontsize=10)
+    # ax6 = fig.add_subplot(2, 3, 6)
+    # ax6.imshow(h_binary, cmap='gray')
+    # ax6.set_title('H', fontsize=10)
+    #plt.show()
+
+    # fig = plt.figure()
+    # ax1 = fig.add_subplot(1, 1, 1)
+    # ax1.imshow(result, cmap='gray')
+
+    result = (rbinary | gbinary | s_binary.astype(np.uint8) | l_binary.astype(np.uint8) | sxbinary)
+
+    return result
 
 def perspectiveTransform(img):
     # Grab the image shape
@@ -303,12 +371,37 @@ def plotWarped(image, warped):
     ax2.set_title('Warped Image', fontsize=20)
     plt.show()
 
+# class Line():
+#     def __init__(self):
+#         # was the line detected in the last iteration?
+#         self.detected = False
+#         # x values of the last n fits of the line
+#         self.recent_xfitted = []
+#         #average x values of the fitted line over the last n iterations
+#         self.bestx = None
+#         #polynomial coefficients averaged over the last n iterations
+#         self.best_fit = None
+#         #polynomial coefficients for the most recent fit
+#         self.current_fit = [np.array([False])]
+#         #radius of curvature of the line in some units
+#         self.radius_of_curvature = None
+#         #distance in meters of vehicle center from the line
+#         self.line_base_pos = None
+#         #difference in fit coefficients between last and new fits
+#         self.diffs = np.array([0,0,0], dtype='float')
+#         #x values for detected line pixels
+#         self.allx = None
+#         #y values for detected line pixels
+#         self.ally = None
+
 def pipeline(img):
     # remove image distortion
     undistorted_img = cal_undistort(img, objpoints, imgpoints)
 
     # Color and Gradient Thresholding
     thrshd_img=thresholding(undistorted_img, s_thresh=(170, 255), sx_thresh=(20, 100))
+
+
 
     #Perspective Transform
     [warped, M] = perspectiveTransform(thrshd_img)
@@ -333,14 +426,14 @@ def pipeline(img):
 
     #draw image back on road
     result = drawImageBackOnRoad(warped, left_fitx, right_fitx, ploty, M, undistorted_img, left_curverad, right_curverad, offset_m)
-
+    #right_lane=Line(detected, recent_xfitted, bestx, best_fit, current_fit, radius_of_curvature, line_base_pos, diffs, allx, ally)
     return result
 
 UseStillImage = False
 additionalplots = False
 
 if UseStillImage:
-    image = mpimg.imread('test_images/test5.jpg')
+    image = mpimg.imread('C:/Users/Chris/Documents/GitHub/CarND-Advanced-Lane-Lines/test_images/test5.jpg')
     # image = mpimg.imread('camera_cal/calibration1.jpg')
 
     result = pipeline(image)
@@ -359,7 +452,7 @@ if UseStillImage:
     plt.show()
 
 else:
-    input_clip = VideoFileClip('project_video.mp4') #.subclip(0,1)
+    input_clip = VideoFileClip('project_video.mp4').subclip(38,43)
     output_clip = input_clip.fl_image(pipeline)
     output_clip.write_videofile('output.mp4', audio=False)
 
