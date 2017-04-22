@@ -43,13 +43,28 @@ def thresholding(img, s_thresh, sx_thresh):
     abs_sobelx = np.absolute(sobelx)  # Absolute x derivative to accentuate lines away from horizontal
     scaled_sobel = np.uint8(255 * abs_sobelx / np.max(abs_sobelx))
 
+    #gradiemt magnitude
+    # Convert to grayscale
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    # Take both Sobel x and y gradients
+    sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
+    sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+    # Calculate the gradient magnitude
+    gradmag = np.sqrt(sobelx**2 + sobely**2)
+    # Rescale to 8 bit
+    scale_factor = np.max(gradmag)/255
+    gradmag = (gradmag/scale_factor).astype(np.uint8)
+    # Create a binary image of ones where threshold is met, zeros otherwise
+    gm_binary = np.zeros_like(gradmag)
+    gm_binary[(gradmag >= 100) & (gradmag <= 200)] = 1
+
     # Threshold x gradient
     sxbinary = np.zeros_like(scaled_sobel)
     sxbinary[(scaled_sobel >= 20) & (scaled_sobel <= 100)] = 1
 
     # Threshold S channel
     s_binary = np.zeros_like(s_channel)
-    s_binary[(s_channel >= 200) & (s_channel <= 230)] = 1
+    s_binary[(s_channel >= 150) & (s_channel <= 230)] = 1
 
     #Threshold on L channel
     l_binary = np.zeros_like(l_channel)
@@ -64,52 +79,52 @@ def thresholding(img, s_thresh, sx_thresh):
     # be beneficial to replace this channel with something else.
     # color_binary = np.dstack((np.zeros_like(sxbinary), sxbinary, s_binary))
     #binary = sxbinary | s_binary.astype(int)
+    if plottingON:
+        fig = plt.figure()
+        ax1 = fig.add_subplot(2, 3, 1)
+        ax1.imshow(scaled_sobel,cmap='gray')
+        ax2 = fig.add_subplot(2, 3, 2)
+        ax2.imshow(r_channel, cmap='gray')
+        ax2.set_title('R', fontsize=10)
+        ax3 = fig.add_subplot(2, 3, 3)
+        ax3.imshow(g_channel, cmap='gray')
+        ax3.set_title('G', fontsize=10)
+        ax4 = fig.add_subplot(2, 3, 4)
+        ax4.imshow(s_channel, cmap='gray')
+        ax4.set_title('S', fontsize=10)
+        ax5 = fig.add_subplot(2, 3, 5)
+        ax5.imshow(l_channel, cmap='gray')
+        ax5.set_title('L', fontsize=10)
+        ax6 = fig.add_subplot(2, 3, 6)
+        ax6.imshow(h_channel, cmap='gray')
+        ax6.set_title('H', fontsize=10)
 
-    # fig = plt.figure()
-    # ax1 = fig.add_subplot(2, 3, 1)
-    # ax1.imshow(scaled_sobel, cmap='gray')
-    # ax2 = fig.add_subplot(2, 3, 2)
-    # ax2.imshow(r_channel, cmap='gray')
-    # ax2.set_title('R', fontsize=10)
-    # ax3 = fig.add_subplot(2, 3, 3)
-    # ax3.imshow(g_channel, cmap='gray')
-    # ax3.set_title('G', fontsize=10)
-    # ax4 = fig.add_subplot(2, 3, 4)
-    # ax4.imshow(s_channel, cmap='gray')
-    # ax4.set_title('S', fontsize=10)
-    # ax5 = fig.add_subplot(2, 3, 5)
-    # ax5.imshow(l_channel, cmap='gray')
-    # ax5.set_title('L', fontsize=10)
-    # ax6 = fig.add_subplot(2, 3, 6)
-    # ax6.imshow(h_channel, cmap='gray')
-    # ax6.set_title('H', fontsize=10)
-    #
-    # fig = plt.figure()
-    # ax1 = fig.add_subplot(2, 3, 1)
-    # ax1.imshow(sxbinary, cmap='gray')
-    # ax2 = fig.add_subplot(2, 3, 2)
-    # ax2.imshow(rbinary, cmap='gray')
-    # ax2.set_title('R', fontsize=10)
-    # ax3 = fig.add_subplot(2, 3, 3)
-    # ax3.imshow(gbinary, cmap='gray')
-    # ax3.set_title('G', fontsize=10)
-    # ax4 = fig.add_subplot(2, 3, 4)
-    # ax4.imshow(s_binary, cmap='gray')
-    # ax4.set_title('S', fontsize=10)
-    # ax5 = fig.add_subplot(2, 3, 5)
-    # ax5.imshow(l_binary, cmap='gray')
-    # ax5.set_title('L', fontsize=10)
-    # ax6 = fig.add_subplot(2, 3, 6)
-    # ax6.imshow(h_binary, cmap='gray')
-    # ax6.set_title('H', fontsize=10)
-    #plt.show()
+        fig = plt.figure()
+        ax1 = fig.add_subplot(2, 3, 1)
+        ax1.imshow(sxbinary, cmap='gray')
+        ax2 = fig.add_subplot(2, 3, 2)
+        ax2.imshow(rbinary, cmap='gray')
+        ax2.set_title('R', fontsize=10)
+        ax3 = fig.add_subplot(2, 3, 3)
+        ax3.imshow(gbinary, cmap='gray')
+        ax3.set_title('G', fontsize=10)
+        ax4 = fig.add_subplot(2, 3, 4)
+        ax4.imshow(s_binary, cmap='gray')
+        ax4.set_title('S', fontsize=10)
+        ax5 = fig.add_subplot(2, 3, 5)
+        ax5.imshow(l_binary, cmap='gray')
+        ax5.set_title('L', fontsize=10)
+        ax6 = fig.add_subplot(2, 3, 6)
+        ax6.imshow(h_binary, cmap='gray')
+        ax6.set_title('H', fontsize=10)
 
-    # fig = plt.figure()
-    # ax1 = fig.add_subplot(1, 1, 1)
-    # ax1.imshow(result, cmap='gray')
 
     result = (rbinary | gbinary | s_binary.astype(np.uint8) | l_binary.astype(np.uint8) | sxbinary)
-
+    if plottingON:
+        fig = plt.figure()
+        ax1 = fig.add_subplot(1, 1, 1)
+        ax1.imshow(result, cmap='gray')
+    #plt.show()
     return result
 
 def perspectiveTransform(img):
@@ -118,7 +133,7 @@ def perspectiveTransform(img):
     w=img.shape[1]
     h = img.shape[0]
     # For source points I'm grabbing the outer four detected corners
-    src = np.float32([[[200, h]], [[w/2-50, 450]], [[w/2+50, 450]], [[w-200, h]]])
+    src = np.float32([[[205, h]], [[w/2-40, 450]], [[w/2+40, 450]], [[w-205, h]]])
     # For destination points, I'm arbitrarily choosing some points to be
     # a nice fit for displaying our warped result
     # again, not exact, but close enough for our purposes
@@ -131,14 +146,15 @@ def perspectiveTransform(img):
 
 def findlanelines(binary_warped):
     histogram = np.sum(binary_warped[binary_warped.shape[0] / 2:, :], axis=0)
-    fig1 = plt.figure()
-    ax1 = fig1.add_subplot(111)
-    #ax1.plot(histogram)
+    if plottingON:
+        fig1 = plt.figure()
+        ax1 = fig1.add_subplot(111)
+        ax1.plot(histogram)
     # Find the peak of the left and right halves of the histogram
     # These will be the starting point for the left and right lines
     midpoint = np.int(histogram.shape[0] / 2)
-    leftx_base = np.argmax(histogram[:midpoint])
-    rightx_base = np.argmax(histogram[midpoint:]) + midpoint
+    leftx_base = np.argmax(histogram[10:midpoint])
+    rightx_base = np.argmax(histogram[midpoint:-11]) + midpoint
     #print("leftx_base ", leftx_base)
     #print("rightx_base ", rightx_base)
     #print("binary warped type: ", binary_warped.dtype)
@@ -214,14 +230,14 @@ def findlanelines(binary_warped):
 
     out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
     out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+    if plottingON:
+        cax = ax1.imshow(out_img)
+        #fig1.colorbar(cax)
 
-    cax = ax1.imshow(out_img)
-    #fig1.colorbar(cax)
-
-    ax1.plot(left_fitx, ploty, color='yellow')
-    ax1.plot(right_fitx, ploty, color='yellow')
-    plt.xlim(0, 1280)
-    plt.ylim(720, 0)
+        ax1.plot(left_fitx, ploty, color='yellow')
+        ax1.plot(right_fitx, ploty, color='yellow')
+        plt.xlim(0, 1280)
+        plt.ylim(720, 0)
 
     [left_curverad, right_curverad] = rocCalc(ploty, lefty, leftx, righty, rightx)
     fitWithHistory(binary_warped, left_fit, right_fit)
@@ -312,13 +328,14 @@ def fitWithHistory(binary_warped, left_fit, right_fit):
     cv2.fillPoly(window_img, np.int_([left_line_pts]), (0, 255, 0))
     cv2.fillPoly(window_img, np.int_([right_line_pts]), (0, 255, 0))
     result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
-    fig = plt.figure()
-    ax1 = fig.add_subplot(111)
-    ax1.imshow(result)
-    ax1.plot(left_fitx, ploty, color='yellow')
-    ax1.plot(right_fitx, ploty, color='yellow')
-    plt.xlim(0, 1280)
-    plt.ylim(720, 0)
+    if plottingON:
+        fig = plt.figure()
+        ax1 = fig.add_subplot(111)
+        ax1.imshow(result)
+        ax1.plot(left_fitx, ploty, color='yellow')
+        ax1.plot(right_fitx, ploty, color='yellow')
+        plt.xlim(0, 1280)
+        plt.ylim(720, 0)
 
 def drawImageBackOnRoad(warped, left_fitx, right_fitx, ploty, M, undist, left_curverad, right_curverad, offset_m):
     # Create an image to draw the lines on
@@ -344,9 +361,10 @@ def drawImageBackOnRoad(warped, left_fitx, right_fitx, ploty, M, undist, left_cu
     result = cv2.putText(result, "right curv: %d (m)" % right_curverad, (900, 40), font, 1, (255, 255, 255), 2, cv2.LINE_AA)
     result = cv2.putText(result, "pos: %.2f (m)" % offset_m, (500, 40), font, 1, (255, 255, 255), 2, cv2.LINE_AA)
     #print("offset: ", offset_m)
-    fig=plt.figure()
-    ax1 = fig.add_subplot(111)
-    ax1.imshow(result)
+    if plottingON:
+        fig=plt.figure()
+        ax1 = fig.add_subplot(111)
+        ax1.imshow(result)
     return result
 
 def plotWarped(image, warped):
@@ -361,18 +379,18 @@ def plotWarped(image, warped):
     ovr2lines1 = cv2.line(warped.copy(), tuple(dst[0][0]), tuple(dst[1][0]), color=[255, 0, 0], thickness=2)
     ovr2lines2 = cv2.line(ovr2lines1, tuple(dst[1][0]), tuple(dst[2][0]), color=[255, 0, 0], thickness=2)
     ovr2lines3 = cv2.line(ovr2lines2, tuple(dst[2][0]), tuple(dst[3][0]), color=[255, 0, 0], thickness=2)
+    if plottingON:
+        fig = plt.figure()
+        ax1 = fig.add_subplot(1, 2, 1)
+        ax1.imshow(ovrlines3)
+        ax1.set_title('Original Image', fontsize=20)
+        ax2 = fig.add_subplot(1, 2, 2)
+        ax2.imshow(ovr2lines3)
+        ax2.set_title('Warped Image', fontsize=20)
+        plt.show()
 
-    fig = plt.figure()
-    ax1 = fig.add_subplot(1, 2, 1)
-    ax1.imshow(ovrlines3)
-    ax1.set_title('Original Image', fontsize=20)
-    ax2 = fig.add_subplot(1, 2, 2)
-    ax2.imshow(ovr2lines3)
-    ax2.set_title('Warped Image', fontsize=20)
-    plt.show()
-
-# class Line():
-#     def __init__(self):
+class Line():
+    def __init__(self):
 #         # was the line detected in the last iteration?
 #         self.detected = False
 #         # x values of the last n fits of the line
@@ -389,8 +407,8 @@ def plotWarped(image, warped):
 #         self.line_base_pos = None
 #         #difference in fit coefficients between last and new fits
 #         self.diffs = np.array([0,0,0], dtype='float')
-#         #x values for detected line pixels
-#         self.allx = None
+          #x values for detected line pixels
+          self.allx = None
 #         #y values for detected line pixels
 #         self.ally = None
 
@@ -414,11 +432,12 @@ def pipeline(img):
     binary_warped[np.nonzero(warped)] = 1
 
     #Finding the lane lines
-    fig=plt.figure()
-    ax1 = fig.add_subplot(1,2,2)
-    ax1.imshow(warped)
-    ax2 = fig.add_subplot(1,2,1)
-    ax2.imshow(binary_warped)
+    if plottingON:
+        fig=plt.figure()
+        ax1 = fig.add_subplot(1,2,2)
+        ax1.imshow(warped)
+        ax2 = fig.add_subplot(1,2,1)
+        ax2.imshow(binary_warped)
     [histogram, left_fitx, right_fitx, ploty, left_curverad, right_curverad] = findlanelines(binary_warped)
 
     #Calculate vehicle offset
@@ -426,14 +445,15 @@ def pipeline(img):
 
     #draw image back on road
     result = drawImageBackOnRoad(warped, left_fitx, right_fitx, ploty, M, undistorted_img, left_curverad, right_curverad, offset_m)
-    #right_lane=Line(detected, recent_xfitted, bestx, best_fit, current_fit, radius_of_curvature, line_base_pos, diffs, allx, ally)
+#    right_lane=Line(allx)
     return result
 
 UseStillImage = False
 additionalplots = False
+plottingON = False
 
 if UseStillImage:
-    image = mpimg.imread('C:/Users/Chris/Documents/GitHub/CarND-Advanced-Lane-Lines/test_images/test5.jpg')
+    image = mpimg.imread('frames/frame582.jpg')
     # image = mpimg.imread('camera_cal/calibration1.jpg')
 
     result = pipeline(image)
@@ -452,7 +472,7 @@ if UseStillImage:
     plt.show()
 
 else:
-    input_clip = VideoFileClip('project_video.mp4').subclip(38,43)
+    input_clip = VideoFileClip('project_video.mp4')
     output_clip = input_clip.fl_image(pipeline)
     output_clip.write_videofile('output.mp4', audio=False)
 
